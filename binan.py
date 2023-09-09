@@ -36,6 +36,7 @@ class bot_tack:
     def candle_history(self, start):
         pair  = self.pair
         interval = self._request().KLINE_INTERVAL_5MINUTE
+        logging.info(f"intervalo de klines (velas) : {interval}")
         
         kline = self._request().get_historical_klines(symbol=pair,interval=interval,start_str=start)
         data = pd.DataFrame(kline,columns=["Open t",

@@ -125,82 +125,13 @@ class strate(test):
                 self.total_cantidad_activos = 0
                 self.cantidad_activos = 0
                 self.earning = 0     
-                
-        
-    def entradas(self):
-        
-        
-        
-        while len(self.buy_timestamp) < len(self.data):
-                self.buy_timestamp.append(np.nan)
-        while len(self.sell_timestamp) < len(self.data):
-                self.sell_timestamp.append(np.nan)
-                
-        self.transations['Signal'] = np.where((self.data > self.transations['sma']) & (self.transations['macd'] > 0) & (self.transations['rsi'] < 30), "Buy", "")
-            
-        for dia in range(len(self.data)):
-            self.current_price = self.data[dia]
-        
-            if self.transations['macd'][dia] >= 0 :
-                self.buy(self.current_price,dia)
-                logging.info(f"compra {self.current_price}")
-            else:
-                pass
-                
-                
-            
-        
-        
-        plt.figure(figsize=(12,6))
-        # plt.plot(self.data, label='Precio de Cierre',color='b')
-        plt.plot(self.transations["rsi"], label='rsi',color='purple')
-        plt.plot(self.transations["macd"], label='macd',color='green')
-        plt.axhline(y=0, color='gray', linestyle='--', linewidth=0.8)
-        plt.axhline(y=30, color='red', linestyle='--', linewidth=0.8)
-        plt.title("precios : macd ,rsi, y sma")
-        plt.legend()
-        
-        
-        plt.figure(figsize=(12, 6))
-       
-        
-        
-        #graficamos el precio y el sma
-        plt.subplot(3, 1, 1)
-        plt.plot(self.data, label='Precio de Cierre', color='blue')
-        plt.plot(self.transations["sma"], label=f'SMA (10)', color='orange')
-        plt.title('Precios y Media Móvil Simple')
-        plt.legend()
-
-        #graficamos el  MACD
-        plt.subplot(3, 1, 2)
-        plt.plot(self.transations["macd"], label='MACD', color='green')
-       
-        plt.axhline(y=0, color='gray', linestyle='--', linewidth=0.8)
-        plt.axhline(y=30, color='red', linestyle='--', linewidth=0.8)
-        plt.title('Indicadores: MACD y RSI')
-        plt.legend()
-        
-        #graficamos el  RSI
-        plt.subplot(3, 1, 3)
-        plt.plot(self.transations["rsi"], label='RSI', color='purple')
-        plt.axhline(y=0, color='gray', linestyle='--', linewidth=0.8)
-        plt.axhline(y=30, color='red', linestyle='--', linewidth=0.8)
-        plt.legend()
-        plt.tight_layout()
-        plt.show()
-        
-        
-    def ploting(self):
-        pass
-            
-            
+                      
             
 if __name__=='__main__':
     bot = bot_tack("BTCUSDT")
     logging.debug(f" ")
     # candle historic trae un data frame 
-    candle_historic = bot.candle_history("2 month")
+    candle_historic = bot.candle_history("1 month")
     rsi_estrategy = strate(candle_historic["Close"])
 
 
