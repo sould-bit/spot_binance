@@ -57,9 +57,12 @@ class strate(test):
         self.transations["rsi"] = indicators(self.data).rsi()
              
         
-    def calcular_antidad_activos_por_precio(self, size):
+    def calcular_antidad_activos_por_precio(self, size: float):
         '''
-        size : espera el tamaño de inversion principal
+        Calcula la cantidad de activos basada en el tamaño de inversión principal.
+
+        Args:
+            size (float): El tamaño de inversión principal.
         '''
         self.cantidad_activos = size / self.current_price
         self.total_cantidad_activos += self.cantidad_activos
@@ -129,40 +132,13 @@ class strate(test):
             
 if __name__=='__main__':
     bot = bot_tack("BTCUSDT")
-    logging.debug(f" ")
-    # candle historic trae un data frame 
     candle_historic = bot.candle_history("1 month")
     rsi_estrategy = strate(candle_historic["Close"])
-
-
-    
-    
-# print(dir(rsi_estrategy))
-# rsi_estrategy.entradas()
     rsi_estrategy.next(size=10,size_segurity=15,umbral_activation=30,ordenes_seguridad=16,riesgo_seguridad=-3,target=2.1)
-
-
-
     candle_historic["compra"] = rsi_estrategy.buy_timestamp
-
     candle_historic["venta"] = rsi_estrategy.sell_timestamp
 
           
 
             
     plotingall(candle_historic)
-#*********************************************************************
-            # GRAFICAR  HISTORICAL and rsi
-#*********************************************************************
-
-# indicator_rsi = indicators(candle_historic.Close).rsi()
-# plt.figure(figsize=(12, 6))
-# plt.scatter(candle_historic.index,candle_historic["venta"], marker='v',label='venta', c='r')
-# plt.scatter(candle_historic.index,candle_historic["compra"], marker='^',label='compra', c='g',)
-# plt.plot(candle_historic["Close"],label="precio")
-
-# plt.legend()
-# plt.title('Compras y Ventas')
-# plt.xlabel('Tiempo')
-# plt.ylabel('Precio')
-# plt.show()
