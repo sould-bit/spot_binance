@@ -54,7 +54,6 @@ def plotingall(close):
     #graficamos el  RSI
     plt.subplot(2, 1, 2)
     plt.plot(transations["rsi"], label='RSI', color='purple')
-    plt.scatter(close.index,close["compra"], marker='^',label='compra', c='g',)
     plt.axhline(y=0, color='gray', linestyle='--', linewidth=0.8)
     plt.axhline(y=30, color='red', linestyle='--', linewidth=0.8)
     plt.legend()
