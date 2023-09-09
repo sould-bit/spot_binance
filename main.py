@@ -1,263 +1,237 @@
 #%%
-from  binance.spot  import Spot 
-from binance.client import  Client as clientt
-import config
-from pprint import pprint
-from time import sleep
-import pandas as pd
-import numpy as np 
-from utils.strategy import indicators
-from backtest import grafickrsi, graficticket,plot_rsi
+from binan import bot_tack
+from strategy import test
+import numpy as np
+import pandas  as pd
+from utils.ind import indicators
+from plotting import plotingall
 import matplotlib.pyplot as plt
+import logging
 
-
-# re realizo pip install pip install TA-Lib, verificar si funciona 
-import talib
-
-client = clientt()
-
-class robotBinance: 
-    __api = config.api
-    __key = config.key
-    
-    #inicia la seccion con spot binance , da inicio a todas las herramientas del binance 
-    BianceClient = Spot(__api,__key)
-    Client = Spot(base_url='https://testnet.binance.vision')
-   
-    
-    
-    def __init__(self, pair:str,  temporality: str):
-        self.pair = pair.upper()
-        self.temporality = temporality
-        self.symbol = self.pair.removesuffix("USDT")
+logging.basicConfig(level=logging.INFO,
+                    format='%(asctime)s - %(levelname)s - %(message)s')
+'''
+        Debug :   10
+        info:     20
+        warning:  30
+        error:    40 
+        critical: 50 
+'''
+class strate(test):
+    def __init__(self, data):
         
-# este metodo hara peticiones , para manejar la exepcion de eero de conection 
-    def _request(self, endpoint: str,  parameters: dict = None):
-        while True:    
-            try:
-                response = getattr(self.Client, endpoint)
+        self.data = data
+        #parameters 
+        self.on_trade = False
+        self.cantidad_activos = 0
+        self.total_cantidad_activos = 0
+        self.earning = 0
+        self.take_profit = 0 
+        self.entry_price = 0
+        
+        
+        # counts trades and sells 
+        self.trades = []
+        self.sells = 0
+        
+        #data managers
+        self.buy_timestamp = []
+        self.sell_timestamp = []
+        
+        #float
+    
+        
+        #int
+        self.pnl = 0 
+        self.capital  = 0
+        self.capital_Final = 0
+        
+        # data frame 
+        self.transations = pd.DataFrame()
+        
+        
+        self.rsi = indicators(self.data).rsi()
+        
+        # self.transations["sma"] = indicators(self.data).SMA()
+        # self.transations["macd"],_,_ = indicators(self.data).macd()
+        self.transations["rsi"] = indicators(self.data).rsi()
+             
+        
+    def calcular_antidad_activos_por_precio(self, size):
+        '''
+        size : espera el tamaño de inversion principal
+        '''
+        self.cantidad_activos = size / self.current_price
+        self.total_cantidad_activos += self.cantidad_activos
+        
+
+        
+    def next(self, size:int,size_segurity:int, umbral_activation:int,ordenes_seguridad:int,riesgo_seguridad:float, target:float):
+        '''
+        size : espera el tamaño de inversion principal
+        size_segurity : el tamaño , de recompra caunto  riesgo_seguridad sea True
+        umbral_activacion : espera el parametro del rsi  ej 30 o 25
+        ordenes_seguridad : el numero maximo de ordenes de seguridad  que se pueden cursar  en un ciclo de trading
+        riesgo_seguridad : el punto de recompra para promediar 
+        target : objetivo take profit en porcentaje
+        '''
+        # mantenemos la lista para graficar las compras y las ventas  de igual valor a el indice de los datos 
+        while len(self.buy_timestamp) < len(self.data):
+                self.buy_timestamp.append(np.nan)
+        while len(self.sell_timestamp) < len(self.data):
+                self.sell_timestamp.append(np.nan)
                 
-                return response() if parameters is None else response(**parameters)
-            except:
-                print(f'el endpoint {endpoint} ha fallado .\n parametros {parameters}\n\n')
-                sleep(2)
+        for dia in range(len(self.data)):
+            self.current_price = self.data[dia]
+            self.earning = (self.current_price -  self.entry_price) * self.total_cantidad_activos
+            porcentage_ganancia = (self.earning / (self.entry_price * self.total_cantidad_activos))*100
+    
+            if self.transations["rsi"][dia] <= umbral_activation and not self.on_trade:
+                self.capital += size
+                self.calcular_antidad_activos_por_precio(size=size)
+                self.entry_price = self.current_price
+                self.trades.append({'cantidad': self.cantidad_activos,'precio': self.current_price})
+                self.buy(self.current_price,dia)
+                self.on_trade = True
+                logging.info(f"el ciclo ha iniciado ")
+                self.log("buy: {} \nassets: {}  \n \nto {} rsi  \nzise_buy:{}"
+                         .format(self.current_price,self.cantidad_activos,self.rsi[dia],size))
+                
+            if porcentage_ganancia <= riesgo_seguridad and len(self.trades) < ordenes_seguridad and self.on_trade:
+                self.capital += size_segurity
+                self.calcular_antidad_activos_por_precio(size=size_segurity)
+                self.trades.append({'cantidad': self.cantidad_activos,'precio': self.current_price})
+                self.entry_price = self.costo_promedio(self.trades)
+                self.earning = (self.current_price -  self.entry_price) * self.total_cantidad_activos
+                self.buy(self.current_price,dia)
+                self.on_trade = True
+                self.log("Rebuy: {} \nassets: {}  \nassets_total: {} \n \nto {} rsi  \n size :{} \n cap: invesment {}"
+                         .format(self.current_price,self.cantidad_activos,self.total_cantidad_activos,self.rsi[dia],size_segurity,self.capital))
+            # la ganancias en este putno , se calculan con los datos de cierre y no en tiempo
+            # real , "si el precio de cierre es - 0.1  lo va a tomar "
+            if porcentage_ganancia >= target  and self.on_trade:
+                self.sell(self.current_price,dia)
+                self.sells += 1
+                self.capital_Final = (self.total_cantidad_activos * self.current_price) + self.earning
+                self.pnl += self.earning
+                self.log("sell: {} with take_profit at {} \n new cap: {}\n".format(self.current_price, self.earning,self.capital_Final))
+                logging.info(f"el ciclo ha terminado \n\n start\n\n{self.capital} end {self.capital_Final}\n\n")
+                logging.info(f"\nsafety orders:\n {len(self.trades) }\nventas:\n{self.sells}\nganancias totales:\n{self.pnl} \ncapital:\n{self.capital_Final}")
+                # inicializar variables 
+                self.capital = 0 
+                self.trades = []
+                self.entry_price = 0
+                self.on_trade = False 
+                self.total_cantidad_activos = 0
+                self.cantidad_activos = 0
+                self.earning = 0     
+                
         
-    def binanceAcount(self) -> dict :
+    def entradas(self):
+        
+        
+        
+        while len(self.buy_timestamp) < len(self.data):
+                self.buy_timestamp.append(np.nan)
+        while len(self.sell_timestamp) < len(self.data):
+                self.sell_timestamp.append(np.nan)
+                
+        self.transations['Signal'] = np.where((self.data > self.transations['sma']) & (self.transations['macd'] > 0) & (self.transations['rsi'] < 30), "Buy", "")
+            
+        for dia in range(len(self.data)):
+            self.current_price = self.data[dia]
+        
+            if self.transations['macd'][dia] >= 0 :
+                self.buy(self.current_price,dia)
+                logging.info(f"compra {self.current_price}")
+            else:
+                pass
+                
+                
+            
+        
+        
+        plt.figure(figsize=(12,6))
+        # plt.plot(self.data, label='Precio de Cierre',color='b')
+        plt.plot(self.transations["rsi"], label='rsi',color='purple')
+        plt.plot(self.transations["macd"], label='macd',color='green')
+        plt.axhline(y=0, color='gray', linestyle='--', linewidth=0.8)
+        plt.axhline(y=30, color='red', linestyle='--', linewidth=0.8)
+        plt.title("precios : macd ,rsi, y sma")
+        plt.legend()
+        
+        
+        plt.figure(figsize=(12, 6))
        
-        account = self._request('account')
-        
-        return account
-    
-    def criptocurriencies(self) -> list :
         
         
-        """
-        devuleve una lista con todas las cripto , con saldos positivos  en la cuenta 
-        """
-        
-        return [cripto for cripto in self.binanceAcount().get('balances') if float(cripto.get('free') ) > 0]
-        
-    def pair_ticket(self, pair:str = None) -> dict:
-        """
-        devuelve el precio actual del par a dispocicion 
-        
-        """
-        
-        symbol = self.pair if pair is None else pair
-        
-        return float(self._request('ticker_price', {'symbol': symbol.upper()}).get("price"))
-        
-    def candlestick(self, limit : int = 3000) :
-        """
-        devuelve un data frame , de velas 
-        
-        Periodo de tiempo	|  Velas de 15 minutos
-        ------------------------------------------
-        Día	   ------------>|  96
-        Semana ------------>|  672
-        Mes	   ------------>|  2.880
-        Año	   ------------>|  34.560
-        -------------------------------------------
-        """
-        parametrs = { 'symbol':self.pair,
-                      'interval':self.temporality,
-                      'limit':limit,
-                      }
-    
-        candle = pd.DataFrame(self._request('klines', parametrs),
-                              columns=[
-                                  "Open time",
-                                  "Open price",
-                                  "High price", 
-                                  "Low price",
-                                  "Close",
-                                  "Volume", 
-                                  "Kline Close time",
-                                  "Quote asset volume",
-                                  "Number of trades",
-                                  "Taker buy base asset volume",
-                                  "Taker buy quote asset volume",
-                                  "Unused field, ignore"],
-                              dtype=float
-                              )
+        #graficamos el precio y el sma
+        plt.subplot(3, 1, 1)
+        plt.plot(self.data, label='Precio de Cierre', color='blue')
+        plt.plot(self.transations["sma"], label=f'SMA (10)', color='orange')
+        plt.title('Precios y Media Móvil Simple')
+        plt.legend()
 
+        #graficamos el  MACD
+        plt.subplot(3, 1, 2)
+        plt.plot(self.transations["macd"], label='MACD', color='green')
+       
+        plt.axhline(y=0, color='gray', linestyle='--', linewidth=0.8)
+        plt.axhline(y=30, color='red', linestyle='--', linewidth=0.8)
+        plt.title('Indicadores: MACD y RSI')
+        plt.legend()
         
-        return candle[['Open time','Kline Close time','Open price','High price','Low price','Close','Volume']]
-    
-    def historical_klines(self,start_time,end_time):
+        #graficamos el  RSI
+        plt.subplot(3, 1, 3)
+        plt.plot(self.transations["rsi"], label='RSI', color='purple')
+        plt.axhline(y=0, color='gray', linestyle='--', linewidth=0.8)
+        plt.axhline(y=30, color='red', linestyle='--', linewidth=0.8)
+        plt.legend()
+        plt.tight_layout()
+        plt.show()
         
-        interval = client.KLINE_INTERVAL_15MINUTE
-        klines = client.get_historical_klines(symbol=self.pair,interval=interval,start_str=start_time,end_str=end_time)
-        data =pd.DataFrame(klines,  columns=
-                           ["Open time",
-                            "Open", 
-                            "High",
-                            "Low",
-                            "Close",
-                            "Volume",
-                            "Close time",
-                            "Quote asset volume",
-                            "Number of trades",
-                            "Taker buy base asset volume",
-                            "Taker buy quote asset volume", 
-                            "Ignore"],
-                           dtype=float)
-        return data[[ "Open time","Close"]]
-        # return [candle for candle in klines]
-
-
+        
+    def ploting(self):
+        pass
             
             
             
-bot = robotBinance("btcusdt","15m")
+if __name__=='__main__':
+    bot = bot_tack("BTCUSDT")
+    logging.debug(f" ")
+    # candle historic trae un data frame 
+    candle_historic = bot.candle_history("2 month")
+    rsi_estrategy = strate(candle_historic["Close"])
 
+
+    
+    
+# print(dir(rsi_estrategy))
+# rsi_estrategy.entradas()
+    rsi_estrategy.next(size=10,size_segurity=15,umbral_activation=30,ordenes_seguridad=16,riesgo_seguridad=-3,target=2.1)
+
+
+
+    candle_historic["compra"] = rsi_estrategy.buy_timestamp
+
+    candle_historic["venta"] = rsi_estrategy.sell_timestamp
+
+          
+
+            
+    plotingall(candle_historic)
 #*********************************************************************
             # GRAFICAR  HISTORICAL and rsi
 #*********************************************************************
-candle_historic = bot.historical_klines("11 Jul, 2023", "30 Aug, 2023")
-# candle_historic.index = candle_historic["Open time"]
-indicator_rsi = talib.RSI(candle_historic["Close"], timeperiod=14)
-# graficticket(candle_historic, 'BTCUSDT')
-plot_rsi(candle_historic["Close"],'btcusdt')
-#*********************************************************************
 
-#*********************************************************************
-            # ordenes
+# indicator_rsi = indicators(candle_historic.Close).rsi()
+# plt.figure(figsize=(12, 6))
+# plt.scatter(candle_historic.index,candle_historic["venta"], marker='v',label='venta', c='r')
+# plt.scatter(candle_historic.index,candle_historic["compra"], marker='^',label='compra', c='g',)
+# plt.plot(candle_historic["Close"],label="precio")
 
-#*********************************************************************
-
-#*********************************************************************
-
-# Este código utiliza un bucle for para recorrer los índices
-# de las listas candle_historic e indicator_rsi.
-# En cada iteración, se obtienen el precio actual
-# y el valor actual del indicador RSI usando los índices correspondientes.
-def señal(datos):
-    buy_threshold = 30
-    sell_threshold = 70
-    take_profit_percent = 2
-    buy_timestamp = []
-    sell_timestamp = []
-    compras = 0
-    ventas = 0
-    on_trade = False
-    capital = 100
-    earnigns = 0
-    take_profit = 0
-    cantidad_activos = 0
-    stop_loss = -0.5
-    for dia in range(len(datos)):
-        precio_actual = datos[dia]
-        rsi_actual = indicator_rsi[dia]
-        # timestamp = candle_historic["Open time"][dia]
-
-        if rsi_actual <= buy_threshold:
-            if not on_trade :
-                on_trade = True
-                compras += 1
-                entry_price = precio_actual
-                buy_timestamp.append(precio_actual)
-                sell_timestamp.append(np.nan)
-                # calculamos la cantidad de activos obtenidos con la compra
-                cantidad_activos = capital /precio_actual
-                # earnigns = 0
-                print(f"\n{earnigns}")
-            else:
-                buy_timestamp.append(np.nan)
-                sell_timestamp.append(np.nan)
-        
-        #  condicion por ganancia  es -1 
-        elif on_trade and earnigns <=  stop_loss:
-
-            ventas +=1
-            sell_timestamp.append(precio_actual)
-            buy_timestamp.append(np.nan)
-            on_trade = False
-            capital = (cantidad_activos * precio_actual)  + earnigns
-            take_profit += earnigns
-            # earnigns = 0 
-            cantidad_activos = 0
-            print(f"earnings {earnigns}")    
-            
-        # condicion por take profit  +1 
-        elif on_trade == True and  earnigns >= take_profit_percent :
-            ventas +=1
-            sell_timestamp.append(precio_actual)
-            buy_timestamp.append(np.nan)
-            on_trade = False
-            capital = (cantidad_activos * precio_actual)  + earnigns
-            cantidad_activos = 0 
-            take_profit += earnigns
-            print(f"earnings {earnigns}")
-            # earnigns = 0 
-                
-        else:
-            buy_timestamp.append(np.nan)
-            sell_timestamp.append(np.nan)
-        if on_trade:
-            earnigns = (precio_actual - entry_price) * cantidad_activos
-            
-       
-                
-    print(f"compras\n {compras}\nventas\n{ ventas}\nganancias totales\n{take_profit} \ncapital\n{capital}")
-    return (buy_timestamp, sell_timestamp)
-    
-    
-señales = señal(candle_historic["Close"])
-señal_v= señales[1]
-señal_c = señales[0]
-# while len(señal_c) < len(candle_historic):
-#     señal_c.append(np.nan)
-# while len(señal_v) < len(candle_historic):
-#     señal_v.append(np.nan)
-
-
-
-candle_historic['compra'] = señal_c
-candle_historic['venta'] = señal_v
-
-
-
-
-#*********************************************************************
-#   graficar las timestamp de buy and sell
-#*********************************************************************
-
-plt.plot(candle_historic["Close"],label="precio")
-
-plt.scatter(candle_historic.index,candle_historic['compra'], marker='^',label='compra', c='g',)
-plt.scatter(candle_historic.index,candle_historic['venta'], marker='v',label='venta', c='r')
-
-plt.legend()
-plt.title('Compras y Ventas')
-plt.xlabel('Tiempo')
-plt.ylabel('Precio')
-plt.show()
-
-
-
-#*********************************************************************
-            # GRAFICAR  
-#*********************************************************************
-
-# candle = bot.candlestick()['Close']
+# plt.legend()
+# plt.title('Compras y Ventas')
+# plt.xlabel('Tiempo')
+# plt.ylabel('Precio')
+# plt.show()
