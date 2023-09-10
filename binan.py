@@ -15,7 +15,7 @@ logging.basicConfig(level=logging.INFO,
         critical: 50 
 '''
 
-class bot_tack:
+class bot_managment:
     
         
         
@@ -28,6 +28,7 @@ class bot_tack:
         while True:
             try :
                 brok =Client(api_key=_key)
+                logging.info(f"iniciando coneccion con la Api: ")
                 return brok
             except :
                 logging.warning(f"no se ha podido establecer la coneccion con binance Appi")
@@ -35,7 +36,7 @@ class bot_tack:
                 
     def candle_history(self, start):
         pair  = self.pair
-        interval = self._request().KLINE_INTERVAL_5MINUTE
+        interval = self._request().KLINE_INTERVAL_1MINUTE
         logging.info(f"intervalo de klines (velas) : {interval}")
         
         kline = self._request().get_historical_klines(symbol=pair,interval=interval,start_str=start)

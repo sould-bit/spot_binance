@@ -28,11 +28,6 @@ class test:
         costo_promedio = total_invertido / total_cantidad if total_cantidad > 0  else 0
         
         return costo_promedio
-    
-    
-    def diferencia_porcentual(self,):
-        pass
-        
         
     def buy(self,price,dia):
         self.buy_timestamp[dia] = price
