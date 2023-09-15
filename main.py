@@ -4,7 +4,7 @@ from strategy import test
 import numpy as np
 import pandas  as pd
 from utils.ind import indicators
-from plotting import plotingall
+from plotting import plotingall,graficticket,prueb
 import logging
 
 logging.basicConfig(level=logging.INFO,
@@ -47,7 +47,7 @@ class strate(test):
         self.transations = pd.DataFrame()
         
         
-        self.rsi = indicators(self.data).rsi()
+        # self.rsi = indicators(self.data_to_rsi).rsi()
         
         # self.transations["sma"] = indicators(self.data).SMA()
         # self.transations["macd"],_,_ = indicators(self.data).macd()
@@ -96,7 +96,7 @@ class strate(test):
                 self.trades.append({'cantidad': self.cantidad_activos,'precio': self.current_price})
                 self.buy(self.current_price,dia)
                 self.on_trade = True
-                logging.info(f"\n=== El Cliclo ha Iniciado ===\n------------------------------------\nBuy : {self.current_price}\nCantidad de acivos : {self.cantidad_activos}\nTo RSI : {self.rsi[dia]}\nSize Buy : {size}\n------------------------------------")
+                logging.info(f"\n=== El Cliclo ha Iniciado ===\n------------------------------------\nBuy : {self.current_price}\nCantidad de acivos : {self.cantidad_activos}\nTo RSI : {self.transations['rsi'][dia]}\nSize Buy : {size}\n------------------------------------")
                 
                 
             if porcentage_ganancia <= riesgo_seguridad and len(self.trades) < ordenes_seguridad and self.on_trade:
@@ -107,7 +107,7 @@ class strate(test):
                 self.earning = (self.current_price -  self.entry_price) * self.total_cantidad_activos
                 self.buy(self.current_price,dia)
                 self.on_trade = True
-                logging.info(f"\n=== Rebuy ===\n------------------------------------\nPrice : {self.current_price}\nAssets : {self.cantidad_activos}\nassets_total: {self.total_cantidad_activos}\nto RSI : {self.rsi[dia]}\nsize : {size_segurity}\ncap : invesment {self.capital}\n------------------------------------")
+                logging.info(f"\n=== Rebuy ===\n------------------------------------\nPrice : {self.current_price}\nAssets : {self.cantidad_activos}\nassets_total: {self.total_cantidad_activos}\nto RSI : {self.transations['rsi'][dia]}\nsize : {size_segurity}\ncap : invesment {self.capital}\n------------------------------------")
             # la ganancias en este putno , se calculan con los datos de cierre y no en tiempo
             # real , "si el precio de cierre es - 0.1  lo va a tomar "
             if porcentage_ganancia >= target  and self.on_trade:
@@ -123,7 +123,7 @@ class strate(test):
 
                 logging.info(f"\n=== Sell ===\n------------------------------------\nSell : {self.current_price}\nWith a take profit at : {self.earning}\n% : {porcentage_ganancia}\nNew cap : {self.capital_Final}\n------------------------------------")
                 logging.info(f"\n\n=== El Cliclo ha Terminado ===\n------------------------------------\nStart : {self.capital}\nEnd : {self.capital_Final}\n------------------------------------")
-                logging.info(f"\nSafety orders : {len(self.trades)}\nVentas : {self.sells}\nGanancias por Ciclo : {self.pnl}\nEarning % : {self.earning_percentage}\nCapital : {self.capital_Final}\n------------------------------------\n")
+                logging.info(f"\nSafety orders : {len(self.trades)}\nVentas : {self.sells}\nGANANCIAS TOTALES : {self.pnl}\nEarning % : {self.earning_percentage}\nCapital : {self.capital_Final}\n------------------------------------\n")
                 # inicializar variables 
                 self.capital = 0 
                 self.trades = []
@@ -137,9 +137,9 @@ class strate(test):
 if __name__=='__main__':
     bot = bot_managment("BTCUSDT")
     candle_historic = bot.candle_history("1 month")
-    rsi_estrategy = strate(candle_historic["Close"])
+    rsi_estrategy = strate(candle_historic['Close'])
     rsi_estrategy.next(size=10,size_segurity=15,umbral_activation=30,ordenes_seguridad=16,riesgo_seguridad=-3,target=2.1)
     candle_historic["compra"] = rsi_estrategy.buy_timestamp
     candle_historic["venta"] = rsi_estrategy.sell_timestamp
 
-    plotingall(candle_historic)
+    prueb(candle_historic)
